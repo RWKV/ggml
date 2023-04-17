@@ -160,7 +160,7 @@ if (GGML_PERF)
     set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_PERF)
 endif()
 
-add_library(${TARGET}
+add_library(${TARGET} OBJECT
     ggml.c
     )
 
