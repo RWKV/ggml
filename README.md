@@ -1,5 +1,12 @@
 # ggml
 
+This fork of `ggml` contains changes necessary for [rwkv.cpp](https://github.com/saharNooby/rwkv.cpp):
+
+- added `Q4_1_O` data type
+- fixed build by adding `OBJECT` keyword to `CMakeLists.txt`
+
+---
+
 Tensor library for machine learning
 
 ***Note that this project is under development and not ready for production use. \

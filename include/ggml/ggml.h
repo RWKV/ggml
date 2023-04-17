@@ -210,6 +210,10 @@ enum ggml_type {
     GGML_TYPE_I8,
     GGML_TYPE_I16,
     GGML_TYPE_I32,
+    // Stores min, delta and a single outlier value for a block.
+    // An outlier is the single absmax element in the quantized block.
+    // Matmul is done in FP32.
+    GGML_TYPE_Q4_1_O,
     GGML_TYPE_COUNT,
 };
 
@@ -811,6 +815,7 @@ enum ggml_opt_result ggml_opt(
 
 size_t ggml_quantize_q4_0(const float * src, void * dst, int n, int k, int64_t * hist);
 size_t ggml_quantize_q4_1(const float * src, void * dst, int n, int k, int64_t * hist);
+size_t ggml_quantize_q4_1_o(const float * src, void * dst, int n, int k, int64_t * hist);
 size_t ggml_quantize_q4_2(const float * src, void * dst, int n, int k, int64_t * hist);
 size_t ggml_quantize_q4_3(const float * src, void * dst, int n, int k, int64_t * hist);
 
