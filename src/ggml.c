@@ -7671,8 +7671,9 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
     const int ir1 = MIN(ir0 + dr, nr);
 
 #if defined(__AVX2__)
-    float outlier_mask[QK4_1_O];
-    memset(outlier_mask, 0, QK4_1_O * sizeof(float));
+    const int block_count = ne00 / QK4_1_O;
+
+    float * const temp = ((float *) params->wdata) + ith * ne00;
 #endif
 
     for (int ir = ir0; ir < ir1; ++ir) {
@@ -7694,20 +7695,29 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
             const int i2 = i02;
             const int i3 = i03;
 
-            const int block_count = ne00 / QK4_1_O;
-
             const block_q4_1_o * row_blocks = (block_q4_1_o *) ((char *) src0->data + (i01 * nb01 + i02 * nb02 + i03 * nb03));
 
             __m256 accum = _mm256_setzero_ps();
 
-            // Here we do fused dequantization and dot product.
+            // Copy vector into a temporary buffer
+            memcpy(temp, (char *) src1->data + (i11 * nb11 + i12 * nb12 + i13 * nb13), ne00 * sizeof(float));
+
+            float outlier_accum = 0.0F;
+
+            // Multiply outliers; set corresponding vector elements to zero
+            for (int block_index = 0; block_index < block_count; block_index++) {
+                // 0 .. 31
+                const uint16_t outlier_index = row_blocks[block_index].outlier_index;
+
+                outlier_accum += temp[block_index * QK4_1_O + outlier_index] * GGML_FP16_TO_FP32(row_blocks[block_index].outlier_value);
+
+                temp[block_index * QK4_1_O + outlier_index] = 0.0F;
+            }
+
+            // Do fused dequantization and dot product
             for (int block_index = 0; block_index < block_count; block_index++) {
                 const float block_d = GGML_FP16_TO_FP32(row_blocks[block_index].d);
                 const float block_m = GGML_FP16_TO_FP32(row_blocks[block_index].m);
-
-                // 0 .. 31
-                const uint16_t outlier_index = row_blocks[block_index].outlier_index;
-                const float outlier_value = GGML_FP16_TO_FP32(row_blocks[block_index].outlier_value);
 
                 const uint8_t * restrict quant_nibbles = row_blocks[block_index].qs;
 
@@ -7716,7 +7726,6 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 // Broadcast values to 8x element float32 vectors
                 const __m256 broadcasted_d = _mm256_broadcast_ss(&block_d);
                 const __m256 broadcasted_m = _mm256_broadcast_ss(&block_m);
-                const __m256 broadcasted_outlier_value = _mm256_broadcast_ss(&outlier_value);
 
                 // Load 32x4-bit integers into 32x8-bit integers
                 const __m256i quant_bytes = bytesFromNibbles(quant_nibbles);
@@ -7737,25 +7746,8 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 const __m256 weight_2 = _mm256_fmadd_ps(quant_floats_2, broadcasted_d, broadcasted_m);
                 const __m256 weight_3 = _mm256_fmadd_ps(quant_floats_3, broadcasted_d, broadcasted_m);
 
-                // TODO This outlier handling is VERY slow
-                // Set outlier mask -- this should give 1 in the most significant bit
-                outlier_mask[outlier_index] = -1.0F;
-                // Load mask into vectors
-                const __m256 outlier_mask_0 = _mm256_load_ps(outlier_mask);
-                const __m256 outlier_mask_1 = _mm256_load_ps(outlier_mask + 8);
-                const __m256 outlier_mask_2 = _mm256_load_ps(outlier_mask + 16);
-                const __m256 outlier_mask_3 = _mm256_load_ps(outlier_mask + 24);
-                // Reset mask array to all zeroes for the next iteration
-                outlier_mask[outlier_index] = 0.0F;
-
-                // Replace the weight at the index of the outlier
-                const __m256 weight_0_with_outlier = _mm256_blendv_ps(weight_0, broadcasted_outlier_value, outlier_mask_0);
-                const __m256 weight_1_with_outlier = _mm256_blendv_ps(weight_1, broadcasted_outlier_value, outlier_mask_1);
-                const __m256 weight_2_with_outlier = _mm256_blendv_ps(weight_2, broadcasted_outlier_value, outlier_mask_2);
-                const __m256 weight_3_with_outlier = _mm256_blendv_ps(weight_3, broadcasted_outlier_value, outlier_mask_3);
-
                 // Load 32 floats of data of the second argument
-                const float * src1_data = (float *) ((char *) src1->data + (block_index * QK4_1_O * nb10 + i11 * nb11 + i12 * nb12 + i13 * nb13));
+                const float * src1_data = temp + block_index * QK4_1_O;
 
                 const __m256 src1_0 = _mm256_load_ps(src1_data);
                 const __m256 src1_1 = _mm256_load_ps(src1_data + 8);
@@ -7763,10 +7755,10 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 const __m256 src1_3 = _mm256_load_ps(src1_data + 24);
 
                 // Multiply weights and values of the second argument element-wise; add to accumulator
-                accum = _mm256_fmadd_ps(src1_0, weight_0_with_outlier, accum);
-                accum = _mm256_fmadd_ps(src1_1, weight_1_with_outlier, accum);
-                accum = _mm256_fmadd_ps(src1_2, weight_2_with_outlier, accum);
-                accum = _mm256_fmadd_ps(src1_3, weight_3_with_outlier, accum);
+                accum = _mm256_fmadd_ps(src1_0, weight_0, accum);
+                accum = _mm256_fmadd_ps(src1_1, weight_1, accum);
+                accum = _mm256_fmadd_ps(src1_2, weight_2, accum);
+                accum = _mm256_fmadd_ps(src1_3, weight_3, accum);
             }
 
             // Add elements of accumulator
@@ -7775,7 +7767,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
             res = _mm_add_ps(res, _mm_movehl_ps(res, res ));
             res = _mm_add_ss(res, _mm_movehdup_ps(res));
 
-            *((float *) ((char *) dst->data + (i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3))) = _mm_cvtss_f32(res);
+            *((float *) ((char *) dst->data + (i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3))) = _mm_cvtss_f32(res) + outlier_accum;
         }
 #else
         float * const wdata = (float *) ((char *) params->wdata + (i01 * nb01 + i02 * nb02 + i03 * nb03));
@@ -10546,13 +10538,10 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                         } else if (node->src0->type == GGML_TYPE_F32 && node->src1->type == GGML_TYPE_F32) {
                             cur = 0;
                         } else if (node->src0->type == GGML_TYPE_Q4_1_O && node->src1->type == GGML_TYPE_F32) {
-#if defined(__AVX2__)
-                            cur = 0;
-#else
                             // Assuming that src1 is a vector
                             // TODO Not sure whether this is correct
-                            cur = GGML_TYPE_SIZE[GGML_TYPE_F32] * ggml_nelements(node->src1);
-#endif
+                            // TODO Ask @ggerganov do we need to multiply work size by n_threads so that each thread gets its own part
+                            cur = GGML_TYPE_SIZE[GGML_TYPE_F32] * ggml_nelements(node->src1) * MAX(1, n_threads);
                         } else if (quantize_fns[node->src0->type].vec_dot_q && node->src1->type == GGML_TYPE_F32) {
 #if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
                             if (ggml_compute_forward_mul_mat_use_blas(node->src0, node->src1, node)) {
