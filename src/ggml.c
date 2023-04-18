@@ -7674,6 +7674,15 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
     const int block_count = ne00 / QK4_1_O;
 
     float * const temp = ((float *) params->wdata) + ith * (ne00 + CACHE_LINE_SIZE_F32);
+
+    if (ne11 != 1) {
+        fprintf(stderr, "Non-vectors are not supported as a second argument for ggml_compute_forward_mul_mat_q4_1_o_f32\n");
+
+        abort();
+    }
+
+    // Copy vector into a temporary buffer
+    memcpy(temp, (char *) src1->data, ne00 * sizeof(float));
 #endif
 
     for (int ir = ir0; ir < ir1; ++ir) {
@@ -7699,20 +7708,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
 
             __m256 accum = _mm256_setzero_ps();
 
-            // Copy vector into a temporary buffer
-            memcpy(temp, (char *) src1->data + (i11 * nb11 + i12 * nb12 + i13 * nb13), ne00 * sizeof(float));
-
             float outlier_accum = 0.0F;
-
-            // Multiply outliers; set corresponding vector elements to zero
-            for (int block_index = 0; block_index < block_count; block_index++) {
-                // 0 .. 31
-                const uint16_t outlier_index = row_blocks[block_index].outlier_index;
-
-                outlier_accum += temp[block_index * QK4_1_O + outlier_index] * GGML_FP16_TO_FP32(row_blocks[block_index].outlier_value);
-
-                temp[block_index * QK4_1_O + outlier_index] = 0.0F;
-            }
 
             // Do fused dequantization and dot product
             for (int block_index = 0; block_index < block_count; block_index++) {
@@ -7746,13 +7742,22 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 const __m256 weight_2 = _mm256_fmadd_ps(quant_floats_2, broadcasted_d, broadcasted_m);
                 const __m256 weight_3 = _mm256_fmadd_ps(quant_floats_3, broadcasted_d, broadcasted_m);
 
-                // Load 32 floats of data of the second argument
-                const float * src1_data = temp + block_index * QK4_1_O;
+                float * src1_data = temp + block_index * QK4_1_O;
+                // Multiply outlier and temporarily set corresponding value to zero
+                // 0 .. 31
+                const uint16_t outlier_index = row_blocks[block_index].outlier_index & 31;
+                const float prev = src1_data[outlier_index];
+                outlier_accum += prev * GGML_FP16_TO_FP32(row_blocks[block_index].outlier_value);
+                src1_data[outlier_index] = 0.0F;
 
+                // Load 32 floats of data of the second argument
                 const __m256 src1_0 = _mm256_load_ps(src1_data);
                 const __m256 src1_1 = _mm256_load_ps(src1_data + 8);
                 const __m256 src1_2 = _mm256_load_ps(src1_data + 16);
                 const __m256 src1_3 = _mm256_load_ps(src1_data + 24);
+
+                // Restore original value
+                src1_data[outlier_index] = prev;
 
                 // Multiply weights and values of the second argument element-wise; add to accumulator
                 accum = _mm256_fmadd_ps(src1_0, weight_0, accum);
