@@ -7673,7 +7673,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
 #if defined(__AVX2__)
     const int block_count = ne00 / QK4_1_O;
 
-    float * const temp = ((float *) params->wdata) + ith * ne00;
+    float * const temp = ((float *) params->wdata) + ith * (ne00 + CACHE_LINE_SIZE_F32);
 #endif
 
     for (int ir = ir0; ir < ir1; ++ir) {
@@ -10539,9 +10539,7 @@ void ggml_graph_compute(struct ggml_context * ctx, struct ggml_cgraph * cgraph) 
                             cur = 0;
                         } else if (node->src0->type == GGML_TYPE_Q4_1_O && node->src1->type == GGML_TYPE_F32) {
                             // Assuming that src1 is a vector
-                            // TODO Not sure whether this is correct
-                            // TODO Ask @ggerganov do we need to multiply work size by n_threads so that each thread gets its own part
-                            cur = GGML_TYPE_SIZE[GGML_TYPE_F32] * ggml_nelements(node->src1) * MAX(1, n_threads);
+                            cur = GGML_TYPE_SIZE[GGML_TYPE_F32] * node->ne[0] * n_threads;
                         } else if (quantize_fns[node->src0->type].vec_dot_q && node->src1->type == GGML_TYPE_F32) {
 #if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
                             if (ggml_compute_forward_mul_mat_use_blas(node->src0, node->src1, node)) {
