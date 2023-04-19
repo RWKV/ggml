@@ -7545,6 +7545,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
               struct ggml_tensor * dst) {
     int64_t t0 = ggml_perf_time_us();
     UNUSED(t0);
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
 
     const int64_t ne00 = src0->ne[0];
     const int64_t ne01 = src0->ne[1];
@@ -7605,7 +7606,9 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
     //   compute by src0 rows
 
 #if defined(GGML_USE_ACCELERATE) || defined(GGML_USE_OPENBLAS)
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
     if (ggml_compute_forward_mul_mat_use_blas(src0, src1, dst)) {
+        fprintf(stderr, "[ggml] %d\n", __LINE__);
         if (params->ith != 0) {
             return;
         }
@@ -7625,6 +7628,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 {
                     size_t id = 0;
                     for (int64_t i01 = 0; i01 < ne01; ++i01) {
+                        fprintf(stderr, "[ggml] %d\n", __LINE__);
                         dequantize_row_q4_1_o((char *) src0->data + i03*nb03 + i02*nb02 + i01*nb01, wdata + id, ne00);
                         id += ne00;
                     }
@@ -7634,6 +7638,8 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 const float * y = (float *) ((char *) src1->data + i02*nb12 + i03*nb13);
 
                 float * d = (float *) ((char *) dst->data + i02*nb2 + i03*nb3);
+
+                fprintf(stderr, "[ggml] %d\n", __LINE__);
 
                 // zT = y * xT
                 cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
@@ -7658,6 +7664,8 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
         return;
     }
 
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
+
     // parallelize by src0 rows using ggml_vec_dot_f32
 
     // total rows in src0
@@ -7671,9 +7679,15 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
     const int ir1 = MIN(ir0 + dr, nr);
 
 #if defined(__AVX2__)
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
+
     const int block_count = ne00 / QK4_1_O;
 
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
+
     float * const temp = ((float *) params->wdata) + ith * (ne00 + CACHE_LINE_SIZE_F32);
+
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
 
     if (ne11 != 1) {
         fprintf(stderr, "Non-vectors are not supported as a second argument for ggml_compute_forward_mul_mat_q4_1_o_f32\n");
@@ -7681,8 +7695,12 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
         abort();
     }
 
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
+
     // Copy vector into a temporary buffer
     memcpy(temp, (char *) src1->data, ne00 * sizeof(float));
+
+    fprintf(stderr, "[ggml] %d\n", __LINE__);
 #endif
 
     for (int ir = ir0; ir < ir1; ++ir) {
@@ -7703,8 +7721,10 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
             const int i1 = i11;
             const int i2 = i02;
             const int i3 = i03;
+            fprintf(stderr, "[ggml] %d\n", __LINE__);
 
             const block_q4_1_o * row_blocks = (block_q4_1_o *) ((char *) src0->data + (i01 * nb01 + i02 * nb02 + i03 * nb03));
+            fprintf(stderr, "[ggml] %d\n", __LINE__);
 
             __m256 accum = _mm256_setzero_ps();
 
@@ -7765,6 +7785,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
                 accum = _mm256_fmadd_ps(src1_2, weight_2, accum);
                 accum = _mm256_fmadd_ps(src1_3, weight_3, accum);
             }
+            fprintf(stderr, "[ggml] %d\n", __LINE__);
 
             // Add elements of accumulator
             __m128 res = _mm256_extractf128_ps(accum, 1);
@@ -7773,11 +7794,14 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
             res = _mm_add_ss(res, _mm_movehdup_ps(res));
 
             *((float *) ((char *) dst->data + (i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3))) = _mm_cvtss_f32(res) + outlier_accum;
+            fprintf(stderr, "[ggml] %d\n", __LINE__);
         }
 #else
         float * const wdata = (float *) ((char *) params->wdata + (i01 * nb01 + i02 * nb02 + i03 * nb03));
+        fprintf(stderr, "[ggml] %d\n", __LINE__);
 
         dequantize_row_q4_1_o((char *) src0->data + (i01 * nb01 + i02 * nb02 + i03 * nb03), wdata, ne00);
+        fprintf(stderr, "[ggml] %d\n", __LINE__);
 
         for (int ic = 0; ic < ne11; ++ic) {
             // src1 indices
@@ -7791,13 +7815,16 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
             const int i2 = i02;
             const int i3 = i03;
 
+            fprintf(stderr, "[ggml] %d\n", __LINE__);
             ggml_vec_dot_f32(
                     ne00,
                     (float *) ((char *) dst->data + (i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3)),
                     wdata,
                     (float *) ((char *) src1->data + (i11 * nb11 + i12 * nb12 + i13 * nb13))
             );
+            fprintf(stderr, "[ggml] %d\n", __LINE__);
         }
+        fprintf(stderr, "[ggml] %d\n", __LINE__);
 #endif
     }
 }
