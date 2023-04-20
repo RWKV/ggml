@@ -7675,7 +7675,7 @@ static void ggml_compute_forward_mul_mat_q4_1_o_f32(
 
     // 32-byte alignment is required for _mm256_load_ps to work
     char * const temp_unaligned = ((char *) params->wdata) + sizeof(float) * ith * (ne00 + CACHE_LINE_SIZE_F32);
-    float * const temp = (float *) (temp_unaligned + ((uintptr_t) temp_unaligned) % 32);
+    float * const temp = (float *) (temp_unaligned + 32 - ((uintptr_t) temp_unaligned) % 32);
 
     if (ne11 != 1) {
         fprintf(stderr, "Non-vectors are not supported as a second argument for ggml_compute_forward_mul_mat_q4_1_o_f32\n");
