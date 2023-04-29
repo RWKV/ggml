@@ -169,19 +169,7 @@
 //
 //
 
-#ifdef GGML_SHARED
-#    if defined(_WIN32) && !defined(__MINGW32__)
-#        ifdef GGML_BUILD
-#            define GGML_API __declspec(dllexport)
-#        else
-#            define GGML_API __declspec(dllimport)
-#        endif
-#    else
-#        define GGML_API __attribute__ ((visibility ("default")))
-#    endif
-#else
-#    define GGML_API
-#endif
+#define GGML_API
 
 #include <stdint.h>
 #include <stddef.h>

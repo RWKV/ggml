@@ -1,5 +1,9 @@
 # ggml
 
+This fork of `ggml` contains minor fixes necessary for [rwkv.cpp](https://github.com/saharNooby/rwkv.cpp).
+
+---
+
 Tensor library for machine learning
 
 ***Note that this project is under development and not ready for production use. \
