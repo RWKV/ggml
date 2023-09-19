@@ -1,3 +1,9 @@
+This is a fork of `ggml` with greatly increased node limit (4K -> 80K) to allow inference of RWKV 14B with `sequence_length = 64`.
+
+It is not recommended to be used outside of `rwkv.cpp`.
+
+Be sure to allocate `ggml` structs on the heap if you still want to use the fork.
+
 # ggml
 
 [Roadmap](https://github.com/users/ggerganov/projects/7) / [Manifesto](https://github.com/ggerganov/llama.cpp/discussions/205)

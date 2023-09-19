@@ -17331,15 +17331,14 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
     return GGML_EXIT_SUCCESS;
 }
 
-struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
+struct ggml_cplan * ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
     if (n_threads <= 0) {
         n_threads = GGML_DEFAULT_N_THREADS;
     }
 
     size_t work_size = 0;
 
-    struct ggml_cplan cplan;
-    memset(&cplan, 0, sizeof(struct ggml_cplan));
+    struct ggml_cplan * cplan = (struct ggml_cplan *) calloc(1, sizeof(struct ggml_cplan));
 
     // thread scheduling for the different operations + work buffer size estimation
     for (int i = 0; i < cgraph->n_nodes; i++) {
@@ -17723,16 +17722,16 @@ struct ggml_cplan ggml_graph_plan(struct ggml_cgraph * cgraph, int n_threads) {
                 } break;
         }
 
-        cplan.n_tasks[i] = n_tasks;
+        cplan->n_tasks[i] = n_tasks;
     }
 
     if (work_size > 0) {
         work_size += CACHE_LINE_SIZE*(n_threads - 1);
     }
 
-    cplan.n_threads = n_threads;
-    cplan.work_size = work_size;
-    cplan.work_data = NULL;
+    cplan->n_threads = n_threads;
+    cplan->work_size = work_size;
+    cplan->work_data = NULL;
 
     return cplan;
 }
@@ -17834,7 +17833,9 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
 }
 
 void ggml_graph_compute_with_ctx(struct ggml_context * ctx, struct ggml_cgraph * cgraph, int n_threads) {
-    struct ggml_cplan cplan = ggml_graph_plan(cgraph, n_threads);
+    struct ggml_cplan * cplan_p = ggml_graph_plan(cgraph, n_threads);
+    struct ggml_cplan cplan = *cplan_p;
+    free(cplan_p);
 
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_WORK_BUFFER, cplan.work_size);
 
@@ -18640,7 +18641,9 @@ static enum ggml_opt_result ggml_opt_adam(
     ggml_graph_reset  (gf);
     ggml_set_f32      (f->grad, 1.0f);
 
-    struct ggml_cplan cplan = ggml_graph_plan(gb, params.n_threads);
+    struct ggml_cplan * cplan_p = ggml_graph_plan(gb, params.n_threads);
+    struct ggml_cplan cplan = *cplan_p;
+    free(cplan_p);
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_WORK_BUFFER, cplan.work_size);
     cplan.work_data = (uint8_t *)ctx->mem_buffer + obj->offs;
     ggml_graph_compute(gb, &cplan);
@@ -18956,7 +18959,9 @@ static enum ggml_opt_result ggml_opt_lbfgs(
         opt->iter = iter;
     }
 
-    struct ggml_cplan cplan = ggml_graph_plan(gb, params.n_threads);
+    struct ggml_cplan * cplan_p = ggml_graph_plan(gb, params.n_threads);
+    struct ggml_cplan cplan = *cplan_p;
+    free(cplan_p);
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_WORK_BUFFER, cplan.work_size);
     cplan.work_data = (uint8_t *)ctx->mem_buffer + obj->offs;
 

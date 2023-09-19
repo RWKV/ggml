@@ -362,28 +362,17 @@ static void free_measure_vmem(void * base_addr, size_t size) {
 }
 
 struct ggml_allocr * ggml_allocr_new_measure(size_t alignment) {
-    struct ggml_allocr * alloc = (struct ggml_allocr *)malloc(sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
+    struct ggml_allocr * alloc = (struct ggml_allocr *) calloc(1, sizeof(struct ggml_allocr) /* + n_free_blocks * sizeof(struct free_block) */);
 
     void * base_addr;
     size_t size;
 
     alloc_measure_vmem(&base_addr, &size);
 
-    *alloc = (struct ggml_allocr){
-        /*.data          = */ base_addr,
-        /*.size          = */ size,
-        /*.alignment     = */ alignment,
-        /*.n_free_blocks = */ 0,
-        /*.free_blocks   = */ {{0}},
-        /*.hash_table    = */ {{0}},
-        /*.max_size      = */ 0,
-        /*.measure       = */ true,
-        /*.parse_seq     = */ {0},
-        /*.parse_seq_len = */ 0,
-#ifdef GGML_ALLOCATOR_DEBUG
-        /*.allocated_tensors = */ {0},
-#endif
-    };
+    alloc->data = base_addr;
+    alloc->size = size;
+    alloc->alignment = alignment;
+    alloc->measure = true;
 
     ggml_allocr_reset(alloc);
 
