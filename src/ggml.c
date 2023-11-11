@@ -18546,6 +18546,28 @@ void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph
 
 ////////////////////////////////////////////////////////////////////////////////
 
+size_t ggml_total_size_for_tensor_data(const struct ggml_context * ctx) {
+    size_t result = 0;
+
+    struct ggml_object * obj = ctx->objects_begin;
+
+    while (obj != NULL && obj != ctx->objects_end) {
+        if (obj->type == GGML_OBJECT_TENSOR) {
+            struct ggml_tensor * tensor = (struct ggml_tensor *) ((uint8_t *) ctx->mem_buffer + obj->offs);
+
+            if (tensor->view_src == NULL) {
+                result += (ggml_type_size(tensor->type) * ggml_nelements(tensor)) / ggml_blck_size(tensor->type);
+            }
+        }
+
+        obj = obj->next;
+    }
+
+    return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 static void ggml_opt_set_params(int np, struct ggml_tensor * const ps[], const float * x) {
     int i = 0;
     for (int p = 0; p < np; ++p) {

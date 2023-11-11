@@ -1657,6 +1657,16 @@ extern "C" {
     // dump the graph into a file using the dot format
     GGML_API void ggml_graph_dump_dot(const struct ggml_cgraph * gb, const struct ggml_cgraph * gf, const char * filename);
 
+    // Sums storage requirements for all tensors.
+    // Formula used: (ggml_type_size(tensor->type) * ggml_nelements(tensor)) / ggml_blck_size(tensor->type)
+    // View tensors are not counted.
+    // Object and tensor overhead is not included.
+    // Intended usage:
+    // 1. construct a context and graph with no_alloc = true
+    // 2. call this function, adding object overhead and alignment to the result
+    // 3. construct the real context and graph with no_alloc = False.
+    GGML_API size_t ggml_total_size_for_tensor_data(const struct ggml_context * ctx);
+
     //
     // optimization
     //
