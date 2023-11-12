@@ -4615,6 +4615,10 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
         /*.scratch_save       =*/ { 0, 0, NULL, },
     };
 
+    if (ctx->mem_buffer == NULL) {
+        fprintf(stderr, "ggml: failed to allocate %zd bytes (%zd MB)\n", mem_size, mem_size / 1024 / 1024);
+    }
+
     GGML_ASSERT(ctx->mem_buffer != NULL);
 
     ggml_assert_aligned(ctx->mem_buffer);
