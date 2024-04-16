@@ -64,6 +64,10 @@
 #define cudaStreamWaitEvent(stream, event) hipStreamWaitEvent(stream, event, 0)
 #define cudaStream_t hipStream_t
 #define cudaSuccess hipSuccess
+#elif defined(GGML_USE_MUSA)
+#include <musa.h>
+#include <mublas.h>
+#include "musa_compatible.cuh"
 #else
 #include <cuda_runtime.h>
 #include <cublas_v2.h>

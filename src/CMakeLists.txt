@@ -217,6 +217,25 @@ if (GGML_CUBLAS)
     endif()
 endif()
 
+if (GGML_MUSA)
+    option(MUSA_ARCH "MUSA architecture" "21")
+
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake")
+
+    find_package(MUSA     REQUIRED)
+
+    message(STATUS "MUSA found")
+
+    enable_language(MUSA)
+
+    add_compile_definitions(GGML_USE_MUSA GGML_USE_CUDA)
+
+    set(GGML_CUDA_SOURCES ggml-cuda.cu ggml-cuda.h)
+    set_source_files_properties(ggml-cuda.cu PROPERTIES LANGUAGE MUSA)
+
+    set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} PUBLIC MUSA::musa MUSA::mublas MUSA::musart)
+endif()
+
 if (GGML_METAL)
     find_library(FOUNDATION_LIBRARY         Foundation              REQUIRED)
     find_library(METAL_FRAMEWORK            Metal                   REQUIRED)
