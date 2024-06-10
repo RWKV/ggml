@@ -54,8 +54,8 @@ With ggml you can efficiently run [Whisper](examples/whisper) inference on the C
 Memory requirements:
 
 | Model  | Disk   | Mem     |
-| ---    | ---    | ---     |
-| tiny   |  75 MB | ~280 MB |
+|--------|--------|---------|
+| tiny   | 75 MB  | ~280 MB |
 | base   | 142 MB | ~430 MB |
 | small  | 466 MB | ~1.0 GB |
 | medium | 1.5 GB | ~2.6 GB |
@@ -95,13 +95,13 @@ python3 ../examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M
 The inference speeds that I get for the different models on my 32GB MacBook M1 Pro are as follows:
 
 | Model | Size  | Time / Token |
-| ---   | ---   | ---    |
-| GPT-2 |  117M |   5 ms |
-| GPT-2 |  345M |  12 ms |
-| GPT-2 |  774M |  23 ms |
-| GPT-2 | 1558M |  42 ms |
-| ---   | ---   | ---    |
-| GPT-J |    6B | 125 ms |
+|-------|-------|--------------|
+| GPT-2 | 117M  | 5 ms         |
+| GPT-2 | 345M  | 12 ms        |
+| GPT-2 | 774M  | 23 ms        |
+| GPT-2 | 1558M | 42 ms        |
+| ---   | ---   | ---          |
+| GPT-J | 6B    | 125 ms       |
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.
 
